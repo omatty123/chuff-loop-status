@@ -1,5 +1,11 @@
 import { useState, useEffect } from 'react';
 
+const chuffPhotos = {
+  green: { src: '/chuff-loop-status/chuff-1.jpg', alt: 'CHUFF in red jacket' },
+  yellow: { src: '/chuff-loop-status/chuff-2.jpg', alt: 'CHUFF on a walk' },
+  red: { src: '/chuff-loop-status/chuff-3.jpg', alt: 'CHUFF close-up' },
+};
+
 export default function ChuffLoopStatus() {
   const [activeLight, setActiveLight] = useState('green');
   const [statusText, setStatusText] = useState('SYSTEM: OPERATIONAL');
@@ -10,13 +16,19 @@ export default function ChuffLoopStatus() {
   useEffect(() => {
     const fetchWeatherData = async () => {
       try {
+        const fetchOptions = {
+          headers: {
+            'User-Agent': '(chuff-loop-status, github.com/omatty123/chuff-loop-status)'
+          }
+        };
+
         // Get the forecast URL for the location (44.2837, -88.3725 = ZIP 54911)
-        const pointsResponse = await fetch('https://api.weather.gov/points/44.2837,-88.3725');
+        const pointsResponse = await fetch('https://api.weather.gov/points/44.2837,-88.3725', fetchOptions);
         if (!pointsResponse.ok) throw new Error('Failed to fetch location data');
         const pointsData = await pointsResponse.json();
 
         // Fetch the detailed forecast
-        const forecastResponse = await fetch(pointsData.properties.forecast);
+        const forecastResponse = await fetch(pointsData.properties.forecast, fetchOptions);
         if (!forecastResponse.ok) throw new Error('Failed to fetch forecast');
         const forecastData = await forecastResponse.json();
 
@@ -111,32 +123,49 @@ export default function ChuffLoopStatus() {
       <div className="bg-gray-800 p-10 rounded-2xl shadow-2xl text-center border-2 border-gray-700 mb-5">
         <h1 className="text-green-500 text-2xl font-bold mb-6 tracking-wider">CHUFF LOOP STATUS</h1>
 
-        {/* Traffic Light */}
-        <div className="bg-gray-950 p-5 rounded-full inline-block mb-5 border-4 border-gray-700">
-          <div
-            className={`w-16 h-16 rounded-full m-2 transition-all duration-300 ${
-              activeLight === 'red'
-                ? 'bg-red-500 shadow-lg shadow-red-500/50 animate-pulse'
-                : 'bg-gray-700 opacity-30'
-            }`}
-            style={activeLight === 'red' ? { animationDuration: '0.5s' } : {}}
-          />
-          <div
-            className={`w-16 h-16 rounded-full m-2 transition-all duration-300 ${
-              activeLight === 'yellow'
-                ? 'bg-yellow-400 shadow-lg shadow-yellow-400/50 animate-pulse'
-                : 'bg-gray-700 opacity-30'
-            }`}
-            style={activeLight === 'yellow' ? { animationDuration: '1s' } : {}}
-          />
-          <div
-            className={`w-16 h-16 rounded-full m-2 transition-all duration-300 ${
-              activeLight === 'green'
-                ? 'bg-green-500 shadow-lg shadow-green-500/50 animate-pulse'
-                : 'bg-gray-700 opacity-30'
-            }`}
-            style={activeLight === 'green' ? { animationDuration: '1.5s' } : {}}
-          />
+        {/* Traffic Light + CHUFF Photo Side by Side */}
+        <div className="flex items-center justify-center gap-6 mb-5">
+          {/* Traffic Light */}
+          <div className="bg-gray-950 p-5 rounded-full border-4 border-gray-700">
+            <div
+              className={`w-16 h-16 rounded-full m-2 transition-all duration-300 ${
+                activeLight === 'green'
+                  ? 'bg-green-500 shadow-lg shadow-green-500/50 animate-pulse'
+                  : 'bg-gray-700 opacity-30'
+              }`}
+              style={activeLight === 'green' ? { animationDuration: '1.5s' } : {}}
+            />
+            <div
+              className={`w-16 h-16 rounded-full m-2 transition-all duration-300 ${
+                activeLight === 'yellow'
+                  ? 'bg-yellow-400 shadow-lg shadow-yellow-400/50 animate-pulse'
+                  : 'bg-gray-700 opacity-30'
+              }`}
+              style={activeLight === 'yellow' ? { animationDuration: '1s' } : {}}
+            />
+            <div
+              className={`w-16 h-16 rounded-full m-2 transition-all duration-300 ${
+                activeLight === 'red'
+                  ? 'bg-red-500 shadow-lg shadow-red-500/50 animate-pulse'
+                  : 'bg-gray-700 opacity-30'
+              }`}
+              style={activeLight === 'red' ? { animationDuration: '0.5s' } : {}}
+            />
+          </div>
+
+          {/* CHUFF Photo */}
+          <div className="relative w-52 h-52 overflow-hidden rounded-xl border-4 border-gray-700">
+            {['green', 'yellow', 'red'].map((color) => (
+              <img
+                key={color}
+                src={chuffPhotos[color].src}
+                alt={chuffPhotos[color].alt}
+                className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${
+                  color === activeLight ? 'opacity-100' : 'opacity-0'
+                }`}
+              />
+            ))}
+          </div>
         </div>
 
         {/* Status Text */}
@@ -187,6 +216,7 @@ export default function ChuffLoopStatus() {
           NWS 54911 →
         </a>
       </div>
+
     </div>
   );
 }
