@@ -1,11 +1,86 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function ChuffLoopStatus() {
   const [activeLight, setActiveLight] = useState('green');
   const [statusText, setStatusText] = useState('SYSTEM: OPERATIONAL');
+  const [defconLevel, setDefconLevel] = useState(3);
+  const [defconInfo, setDefconInfo] = useState('Loading weather data...');
 
-  const defconLevel = 2;
-  const defconInfo = '50% chance snow, <0.5" · Blowing snow til 4pm';
+  // Fetch weather data and calculate DEFCON level
+  useEffect(() => {
+    const fetchWeatherData = async () => {
+      try {
+        // Get the forecast URL for the location (44.2837, -88.3725 = ZIP 54911)
+        const pointsResponse = await fetch('https://api.weather.gov/points/44.2837,-88.3725');
+        if (!pointsResponse.ok) throw new Error('Failed to fetch location data');
+        const pointsData = await pointsResponse.json();
+
+        // Fetch the detailed forecast
+        const forecastResponse = await fetch(pointsData.properties.forecast);
+        if (!forecastResponse.ok) throw new Error('Failed to fetch forecast');
+        const forecastData = await forecastResponse.json();
+
+        // Get the current period's forecast
+        const currentPeriod = forecastData.properties.periods[0];
+        const detailedForecast = currentPeriod.detailedForecast.toLowerCase();
+        const shortForecast = currentPeriod.shortForecast;
+
+        // Calculate DEFCON level based on snow conditions
+        let level = 3;
+        let info = shortForecast;
+
+        // Check for snow-related keywords and accumulation
+        const hasSnow = detailedForecast.includes('snow');
+        const hasBlizzard = detailedForecast.includes('blizzard');
+        const hasIce = detailedForecast.includes('ice') || detailedForecast.includes('freezing rain');
+
+        // Parse snow accumulation if mentioned
+        const accumulationMatch = detailedForecast.match(/(\d+)\s*to\s*(\d+)\s*inch/i) ||
+                                   detailedForecast.match(/(\d+)\s*inch/i);
+        let maxAccumulation = 0;
+        if (accumulationMatch) {
+          maxAccumulation = parseInt(accumulationMatch[2] || accumulationMatch[1], 10);
+        }
+
+        // Parse snow chance if mentioned
+        const chanceMatch = detailedForecast.match(/chance\s+of\s+(?:snow|precipitation)[^\d]*(\d+)/i) ||
+                            detailedForecast.match(/(\d+)\s*percent\s+chance/i);
+        let snowChance = 0;
+        if (chanceMatch) {
+          snowChance = parseInt(chanceMatch[1], 10);
+        }
+
+        // Determine DEFCON level
+        if (hasBlizzard || maxAccumulation >= 6 || (hasSnow && hasIce)) {
+          level = 1; // Maximum threat
+          info = `${shortForecast} · ${maxAccumulation > 0 ? maxAccumulation + '"+ accumulation' : 'Severe conditions'}`;
+        } else if (hasSnow && (maxAccumulation >= 2 || snowChance >= 50)) {
+          level = 2; // Elevated threat
+          info = `${snowChance > 0 ? snowChance + '% chance snow' : shortForecast}${maxAccumulation > 0 ? ', ' + maxAccumulation + '" possible' : ''}`;
+        } else if (hasSnow || hasIce) {
+          level = 2; // Elevated for any snow/ice mention
+          info = shortForecast;
+        } else {
+          level = 3; // No threat
+          info = shortForecast;
+        }
+
+        setDefconLevel(level);
+        setDefconInfo(info);
+
+      } catch (error) {
+        console.error('Weather fetch error:', error);
+        setDefconInfo('Unable to fetch weather data');
+        setDefconLevel(3);
+      }
+    };
+
+    // Fetch immediately and then every 30 minutes
+    fetchWeatherData();
+    const interval = setInterval(fetchWeatherData, 30 * 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const updateStatus = (color, text) => {
     setActiveLight(color);
